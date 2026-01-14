@@ -1,0 +1,134 @@
+using System;
+using UnityEngine;
+
+namespace PoEClone2D
+{
+    public class InventorySystem : MonoBehaviour
+    {
+        [SerializeField] private int inventorySize = 30;
+        private ItemData[] items;
+
+        public Action onInventoryChanged;
+
+        void Start()
+        {
+            items = new ItemData[inventorySize];
+            Debug.Log($"Inventory: {inventorySize} slots ready");
+        }
+
+        public bool AddItem(ItemData item)
+        {
+            if (item == null) return false;
+
+            // Try to stack
+            if (item.isStackable)
+            {
+                for (int i = 0; i < items.Length; i++)
+                {
+                    if (items[i] != null && items[i].itemName == item.itemName &&
+                        items[i].currentStack < items[i].maxStack)
+                    {
+                        items[i].currentStack++;
+                        onInventoryChanged?.Invoke();
+                        Debug.Log($"Stacked {item.itemName} (now {items[i].currentStack}/{items[i].maxStack})");
+                        return true;
+                    }
+                }
+            }
+
+            // Find empty slot
+            for (int i = 0; i < items.Length; i++)
+            {
+                if (items[i] == null)
+                {
+                    items[i] = Instantiate(item); // Copy ScriptableObject
+                    items[i].currentStack = 1;
+                    onInventoryChanged?.Invoke();
+                    Debug.Log($"Added {item.itemName} to slot {i}");
+                    return true;
+                }
+            }
+
+            Debug.Log("Inventory full");
+            return false;
+        }
+
+        public void RemoveItem(int slotIndex)
+        {
+            if (slotIndex >= 0 && slotIndex < items.Length && items[slotIndex] != null)
+            {
+                Debug.Log($"Removed {items[slotIndex].itemName}");
+                items[slotIndex] = null;
+                onInventoryChanged?.Invoke();
+            }
+        }
+        
+        // NEW METHOD: Reduce stack size by 1 instead of removing entire stack
+        public void ReduceItemStack(int slotIndex)
+        {
+            if (slotIndex >= 0 && slotIndex < items.Length && items[slotIndex] != null)
+            {
+                if (items[slotIndex].isStackable && items[slotIndex].currentStack > 1)
+                {
+                    // Reduce stack by 1
+                    items[slotIndex].currentStack--;
+                    Debug.Log($"Reduced {items[slotIndex].itemName} stack to {items[slotIndex].currentStack}");
+                    onInventoryChanged?.Invoke();
+                }
+                else
+                {
+                    // Remove item if stack is 1 or item is not stackable
+                    Debug.Log($"Removing last item: {items[slotIndex].itemName}");
+                    items[slotIndex] = null;
+                    onInventoryChanged?.Invoke();
+                }
+            }
+        }
+
+        public ItemData GetItem(int slotIndex)
+        {
+            if (slotIndex >= 0 && slotIndex < items.Length)
+                return items[slotIndex];
+            return null;
+        }
+
+        public int GetInventorySize() => inventorySize;
+
+        // TEST METHODS
+        [ContextMenu("Add Test Sword")]
+        public void AddTestSword()
+        {
+            ItemData sword = ScriptableObject.CreateInstance<ItemData>();
+            sword.itemName = "Iron Sword";
+            sword.description = "Basic sword";
+            sword.itemType = ItemType.Weapon;
+            sword.equipSlot = ItemSlot.MainHand;
+            sword.minDamage = 10;
+            sword.maxDamage = 15;
+            AddItem(sword);
+        }
+
+        [ContextMenu("Add Test Potion")]
+        public void AddTestPotion()
+        {
+            ItemData potion = ScriptableObject.CreateInstance<ItemData>();
+            potion.itemName = "Health Potion";
+            potion.description = "Heals 50 HP";
+            potion.itemType = ItemType.Consumable;
+            potion.isStackable = true;
+            potion.maxStack = 5;
+            potion.healAmount = 50;
+            AddItem(potion);
+        }
+        
+        // NEW: Add multiple potions for testing stacks
+        [ContextMenu("Add 3 Potions")]
+        public void AddThreePotions()
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                AddTestPotion();
+            }
+        }
+    }
+}
